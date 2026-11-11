@@ -1,0 +1,1032 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Browser Storage Consent Test: Technical Reference</title>
+  <meta name="description"
+    content="How the consent test script writes to cookies, Web Storage, IndexedDB, Cache Storage and Service Workers, and how OneTrust script blocking controls each write." />
+  <style>
+    :root {
+      --paper: #F7F6F2;
+      --ink: #151515;
+      --ink-2: #55524D;
+      --line: #D9D6CF;
+      --accent: #B3261E;
+      --code: #EFECE5;
+      --max: 960px
+    }
+
+    * {
+      box-sizing: border-box
+    }
+
+    html {
+      scroll-behavior: smooth;
+      scroll-padding-top: 1.5rem
+    }
+
+    @media (prefers-reduced-motion:reduce) {
+      html {
+        scroll-behavior: auto
+      }
+    }
+
+    body {
+      margin: 0;
+      background: var(--paper);
+      color: var(--ink);
+      font: 1.0625rem/1.65 ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif
+    }
+
+    .skip {
+      position: absolute;
+      left: 1rem;
+      top: -100px;
+      background: var(--ink);
+      color: #fff;
+      padding: .6rem 1rem
+    }
+
+    .skip:focus {
+      top: 1rem
+    }
+
+    :focus-visible {
+      outline: 2px solid var(--accent);
+      outline-offset: 3px
+    }
+
+    main {
+      max-width: var(--max);
+      margin: 0 auto;
+      padding: 3rem 1.25rem 5rem
+    }
+
+    h1 {
+      font-size: clamp(2rem, 1.4rem + 2.5vw, 3rem);
+      line-height: 1.1;
+      letter-spacing: -.02em;
+      margin: 0 0 1rem
+    }
+
+    h2 {
+      font-size: clamp(1.5rem, 1.2rem + 1.2vw, 2rem);
+      letter-spacing: -.015em;
+      margin: 3.5rem 0 1rem;
+      padding-top: 1.5rem;
+      border-top: 1px solid var(--line)
+    }
+
+    h3 {
+      font-size: 1.2rem;
+      margin: 2rem 0 .5rem
+    }
+
+    p,
+    li {
+      max-width: 72ch
+    }
+
+    a {
+      color: var(--accent)
+    }
+
+    code {
+      font: .92em ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      background: var(--code);
+      padding: .1em .35em;
+      border-radius: 4px
+    }
+
+    pre {
+      background: #1C1B19;
+      color: #EDEAE3;
+      padding: 1rem 1.25rem;
+      border-radius: 8px;
+      overflow-x: auto;
+      font-size: .9rem;
+      line-height: 1.55
+    }
+
+    pre code {
+      background: none;
+      padding: 0;
+      color: inherit
+    }
+
+    .lead {
+      font-size: 1.15rem;
+      color: var(--ink-2)
+    }
+
+    .toc {
+      background: #fff;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 1rem 1.5rem;
+      margin: 2rem 0
+    }
+
+    .toc ol {
+      margin: .5rem 0 0;
+      padding-left: 1.25rem;
+      columns: 2;
+      column-gap: 2rem
+    }
+
+    @media (max-width:640px) {
+      .toc ol {
+        columns: 1
+      }
+    }
+
+    .toc a {
+      display: inline-block;
+      padding: .2rem 0
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 1rem 0;
+      font-size: .95rem;
+      background: #fff
+    }
+
+    th,
+    td {
+      text-align: left;
+      vertical-align: top;
+      padding: .6rem .75rem;
+      border: 1px solid var(--line)
+    }
+
+    th {
+      background: #EFECE5
+    }
+
+    .table-wrap {
+      overflow-x: auto
+    }
+
+    .note {
+      border-left: 4px solid var(--accent);
+      background: #fff;
+      padding: .75rem 1rem;
+      margin: 1.25rem 0
+    }
+
+    .refs {
+      padding-left: 1.25rem
+    }
+
+    .refs li {
+      margin: .25rem 0
+    }
+
+    .tag {
+      display: inline-block;
+      font-size: .8rem;
+      font-weight: 600;
+      padding: .1rem .5rem;
+      border-radius: 999px;
+      background: #151515;
+      color: #fff;
+      margin-right: .35rem
+    }
+  </style>
+</head>
+
+<body>
+  <a class="skip" href="#content">Skip to content</a>
+  <main id="content">
+
+    <h1>Browser Storage Consent Test: Technical Reference</h1>
+    <p class="lead">How the test script writes to each type of browser storage, what each technology does, and how
+      OneTrust consent categories control every write.</p>
+
+    <nav class="toc" aria-labelledby="toc-title">
+      <strong id="toc-title">On this page</strong>
+      <ol>
+        <li><a href="#overview">Overview</a></li>
+        <li><a href="#consent-blocking">How consent blocking works</a></li>
+        <li><a href="#helpers">The helper script</a></li>
+        <li><a href="#cookies">Cookies</a></li>
+        <li><a href="#web-storage">localStorage and sessionStorage</a></li>
+        <li><a href="#indexeddb">IndexedDB</a></li>
+        <li><a href="#cache-storage">Cache Storage</a></li>
+        <li><a href="#service-worker">Service Workers</a></li>
+        <li><a href="#comparison">Storage comparison</a></li>
+        <li><a href="#withdrawal">Consent withdrawal and cleanup</a></li>
+        <li><a href="#testing">How to test</a></li>
+        <li><a href="#source">Full test script</a></li>
+        <li><a href="#references">References</a></li>
+      </ol>
+    </nav>
+
+    <!-- ============================================================ -->
+    <section id="overview" aria-labelledby="h-overview">
+      <h2 id="h-overview">1. Overview</h2>
+      <p>This test script writes sample data to each type of browser storage and ties every write to a OneTrust consent
+        category. That makes it easy to check whether the CMP blocks and allows each one correctly.</p>
+
+      <h3>Summary</h3>
+      <p>A helper script loads first and is never blocked. It defines three reusable functions: one sets cookies with a
+        one-year expiry and the <code>SameSite</code> and <code>Secure</code> attributes, one writes to localStorage or
+        sessionStorage and catches errors so a blocked storage doesn't stop the page, and one adds a record to IndexedDB
+        and then closes the connection so the database can be deleted later.</p>
+      <p>The writes themselves are split into four script blocks, one per consent category. Each block is set to
+        <code>type="text/plain"</code>, so it only runs once the user consents to its category:</p>
+      <ul>
+        <li><strong>Performance (C0002)</strong> sets <code>PerformanceCookie</code> and saves
+          <code>PerformanceLocal</code> in localStorage.</li>
+        <li><strong>Functional (C0003)</strong> sets <code>FunctionalCookie</code> and saves
+          <code>FunctionalSession</code> in sessionStorage, which is cleared when the tab closes.</li>
+        <li><strong>Targeting (C0004)</strong> sets <code>TargetingCookie</code>, saves <code>TargetingLocal</code> as a
+          JSON object in localStorage, and adds a record to the <code>TestDB</code> IndexedDB database.</li>
+        <li><strong>Social Media (C0005)</strong> sets <code>SocialCookie</code> and adds a test entry to the
+          <code>test-cache-v1</code> Cache Storage.</li>
+      </ul>
+      <p>A final, unblocked script registers an optional Service Worker (<code>/sw.js</code>). If the file is missing,
+        it logs a warning instead of failing silently.</p>
+      <p>Consent only decides whether each block runs. Data that has already been written stays in the browser after the
+        user withdraws consent and has to be removed separately, for example with the clear-storage script.</p>
+
+      <div class="table-wrap">
+        <table>
+          <caption style="text-align:left;font-weight:600;padding:.5rem 0">What each category writes</caption>
+          <thead>
+            <tr>
+              <th scope="col">Category</th>
+              <th scope="col">Cookie</th>
+              <th scope="col">Web Storage</th>
+              <th scope="col">IndexedDB</th>
+              <th scope="col">Cache Storage</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <th scope="row">C0002 Performance</th>
+              <td><code>PerformanceCookie</code></td>
+              <td>localStorage <code>PerformanceLocal</code></td>
+              <td>—</td>
+              <td>—</td>
+            </tr>
+            <tr>
+              <th scope="row">C0003 Functional</th>
+              <td><code>FunctionalCookie</code></td>
+              <td>sessionStorage <code>FunctionalSession</code></td>
+              <td>—</td>
+              <td>—</td>
+            </tr>
+            <tr>
+              <th scope="row">C0004 Targeting</th>
+              <td><code>TargetingCookie</code></td>
+              <td>localStorage <code>TargetingLocal</code> (JSON)</td>
+              <td><code>TestDB</code> → <code>TrackingStore</code></td>
+              <td>—</td>
+            </tr>
+            <tr>
+              <th scope="row">C0005 Social Media</th>
+              <td><code>SocialCookie</code></td>
+              <td>—</td>
+              <td>—</td>
+              <td><code>test-cache-v1</code></td>
+            </tr>
+            <tr>
+              <th scope="row">Not blocked</th>
+              <td colspan="4">Helper functions and Service Worker registration (<code>/sw.js</code>)</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- ============================================================ -->
+    <section id="consent-blocking" aria-labelledby="h-consent">
+      <h2 id="h-consent">2. How consent blocking works</h2>
+      <p><strong>What it is.</strong> Browsers only execute a <code>&lt;script&gt;</code> whose <code>type</code> is a
+        JavaScript MIME type (or is empty). Any other value, such as <code>text/plain</code>, makes the browser treat
+        the block as inert data. OneTrust uses this behaviour for <em>JavaScript type rewriting</em>, its recommended
+        manual blocking method: you mark a script as <code>text/plain</code> and add a class naming its category, and
+        OneTrust switches it to an executable type once that category has consent.</p>
+
+      <pre><code>&lt;!-- Normal script: runs immediately --&gt;
+&lt;script type="text/javascript"&gt; code &lt;/script&gt;
+
+&lt;!-- Blocked until Performance (C0002) is allowed --&gt;
+&lt;script type="text/plain" class="optanon-category-C0002"&gt; code &lt;/script&gt;
+
+&lt;!-- External file, same pattern --&gt;
+&lt;script type="text/plain" class="optanon-category-C0004" src="/js/ads.js"&gt;&lt;/script&gt;
+
+&lt;!-- Needs several categories: all must be allowed --&gt;
+&lt;script type="text/plain" class="optanon-category-C0002-C0004"&gt; code &lt;/script&gt;</code></pre>
+
+      <h3>Default category IDs</h3>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th scope="col">ID</th>
+              <th scope="col">Category</th>
+              <th scope="col">Typical examples</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><code>C0001</code></td>
+              <td>Strictly Necessary</td>
+              <td>Session, load balancing, consent cookie itself</td>
+            </tr>
+            <tr>
+              <td><code>C0002</code></td>
+              <td>Performance</td>
+              <td>Analytics, e.g. Google Analytics</td>
+            </tr>
+            <tr>
+              <td><code>C0003</code></td>
+              <td>Functional</td>
+              <td>Language selection, chat widgets</td>
+            </tr>
+            <tr>
+              <td><code>C0004</code></td>
+              <td>Targeting</td>
+              <td>Advertising, remarketing pixels</td>
+            </tr>
+            <tr>
+              <td><code>C0005</code></td>
+              <td>Social Media</td>
+              <td>Share buttons, embedded social content</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="note"><strong>Key point:</strong> a CMP can't block a cookie or storage write directly. It blocks the
+        <em>script</em> that performs the write. Any write placed outside a blocked script, for example in the helper
+        block, runs regardless of consent.</div>
+
+      <h3>Use cases</h3>
+      <ul>
+        <li>Hard-coded inline scripts that Auto-Blocking doesn't recognise.</li>
+        <li>First-party custom scripts that write to localStorage, IndexedDB or Cache Storage.</li>
+        <li>Testing that each category is enforced on its own before a production rollout.</li>
+      </ul>
+      <p>Don't combine manual blocking and Auto-Blocking on the same script. Use one method per source.</p>
+    </section>
+
+    <!-- ============================================================ -->
+    <section id="helpers" aria-labelledby="h-helpers">
+      <h2 id="h-helpers">3. The helper script</h2>
+      <p>The helper block only <em>defines</em> functions and stores nothing, so it can safely run without consent. Its
+        functions are global, so the category blocks can call them once OneTrust unblocks them.</p>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th scope="col">Function</th>
+              <th scope="col">What it does</th>
+              <th scope="col">Why it's built this way</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><code>isHttps</code></td>
+              <td>Checks <code>location.protocol</code></td>
+              <td>Lets <code>Secure</code> be added only on HTTPS, so the test still works on
+                <code>http://localhost</code>.</td>
+            </tr>
+            <tr>
+              <td><code>setCookie()</code></td>
+              <td>Writes a cookie with <code>path=/</code>, a one-year <code>max-age</code>, <code>SameSite=Lax</code>
+                and conditional <code>Secure</code></td>
+              <td>Encodes the value with <code>encodeURIComponent</code> so semicolons, commas or spaces can't break the
+                cookie string.</td>
+            </tr>
+            <tr>
+              <td><code>safeStorage()</code></td>
+              <td>Writes to localStorage or sessionStorage inside <code>try/catch</code></td>
+              <td>Storage can throw (quota full, or storage disabled by settings or privacy mode). Catching the error
+                keeps the rest of the page running. Objects are converted with <code>JSON.stringify</code> because Web
+                Storage only stores strings.</td>
+            </tr>
+            <tr>
+              <td><code>writeIndexedDB()</code></td>
+              <td>Opens a database, creates the store on first run, writes one record and closes the connection</td>
+              <td>An open connection blocks <code>indexedDB.deleteDatabase()</code>. Closing it lets the clear-storage
+                script delete the database.</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- ============================================================ -->
+    <section id="cookies" aria-labelledby="h-cookies">
+      <h2 id="h-cookies">4. Cookies</h2>
+      <p><span class="tag">C0002</span><span class="tag">C0003</span><span class="tag">C0004</span><span
+          class="tag">C0005</span></p>
+      <p><strong>What it is.</strong> A cookie is a small name–value pair the browser stores and <em>automatically sends
+          to the server</em> with matching HTTP requests. Servers set cookies with the <code>Set-Cookie</code> response
+        header. Scripts read and write them through <code>document.cookie</code>, which acts as a getter and setter.
+        Each assignment sets or updates only one cookie.</p>
+
+      <h3>Attributes used in the test</h3>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th scope="col">Attribute</th>
+              <th scope="col">Meaning</th>
+              <th scope="col">Value in test</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><code>path</code></td>
+              <td>URL path the cookie applies to. <code>/</code> means the whole site.</td>
+              <td><code>/</code></td>
+            </tr>
+            <tr>
+              <td><code>max-age</code></td>
+              <td>Lifetime in seconds, relative to now. Takes precedence over <code>expires</code>. Without either, the
+                cookie is a <em>session cookie</em> and is removed when the browser closes.</td>
+              <td><code>31536000</code> (one year)</td>
+            </tr>
+            <tr>
+              <td><code>SameSite</code></td>
+              <td>Controls whether the cookie is sent on cross-site requests. <code>Strict</code> sends it only in
+                same-site contexts. <code>Lax</code> also sends it on top-level navigations <em>to</em> the site.
+                <code>None</code> sends it everywhere and requires <code>Secure</code>.</td>
+              <td><code>Lax</code></td>
+            </tr>
+            <tr>
+              <td><code>Secure</code></td>
+              <td>Only sent over HTTPS.</td>
+              <td>Added on HTTPS only</td>
+            </tr>
+            <tr>
+              <td><code>domain</code></td>
+              <td>Host the cookie is sent to. If omitted, it's the current host only, with no subdomains. If set,
+                subdomains are included.</td>
+              <td>Omitted (host-only)</td>
+            </tr>
+            <tr>
+              <td><code>HttpOnly</code></td>
+              <td>Hides the cookie from JavaScript. It can only be set by the server, not through
+                <code>document.cookie</code>.</td>
+              <td>Not used</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h3>Examples</h3>
+      <pre><code>// Set
+document.cookie = "theme=dark; path=/; max-age=2592000; SameSite=Lax; Secure";
+
+// Read one cookie
+const theme = document.cookie.split("; ").find(c =&gt; c.startsWith("theme="))?.split("=")[1];
+
+// Delete: same name, path and domain, with max-age=0
+document.cookie = "theme=; path=/; max-age=0";
+
+// Server-side equivalent
+Set-Cookie: theme=dark; Path=/; Max-Age=2592000; SameSite=Lax; Secure</code></pre>
+
+      <h3>Use cases</h3>
+      <ul>
+        <li>Session and login state (usually <code>HttpOnly</code>, set by the server).</li>
+        <li>Analytics identifiers such as <code>_ga</code> (Performance).</li>
+        <li>Language or region preference (Functional).</li>
+        <li>Advertising and remarketing IDs (Targeting).</li>
+        <li>Storing the consent decision itself, for example OneTrust's <code>OptanonConsent</code>.</li>
+      </ul>
+
+      <div class="note"><strong>Testing tip:</strong> to delete a cookie, you must match its <code>path</code> and
+        <code>domain</code> exactly. A cookie set with <code>domain=.example.com</code> won't be removed by a delete
+        that omits the domain. This is a common reason cookies "survive" consent withdrawal.</div>
+    </section>
+
+    <!-- ============================================================ -->
+    <section id="web-storage" aria-labelledby="h-webstorage">
+      <h2 id="h-webstorage">5. localStorage and sessionStorage (Web Storage API)</h2>
+      <p><span class="tag">C0002</span><span class="tag">C0003</span><span class="tag">C0004</span></p>
+      <p><strong>What it is.</strong> Web Storage is a simple, synchronous key–value store of <em>strings</em>, scoped
+        to the page's origin (scheme + host + port). Unlike cookies, its data is <em>never sent to the server</em>
+        automatically. Browsers typically allow around 5 MB per origin.</p>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th scope="col"></th>
+              <th scope="col">localStorage</th>
+              <th scope="col">sessionStorage</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <th scope="row">Lifetime</th>
+              <td>Persists until cleared by script or user</td>
+              <td>Cleared when the tab or window closes</td>
+            </tr>
+            <tr>
+              <th scope="row">Scope</th>
+              <td>Shared by all tabs on the same origin</td>
+              <td>Per tab and per origin</td>
+            </tr>
+            <tr>
+              <th scope="row">Used in test for</th>
+              <td><code>PerformanceLocal</code>, <code>TargetingLocal</code></td>
+              <td><code>FunctionalSession</code></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h3>Examples</h3>
+      <pre><code>localStorage.setItem("PerformanceLocal", "Performance localStorage!");
+localStorage.getItem("PerformanceLocal");         // "Performance localStorage!"
+
+// Objects must be serialised
+localStorage.setItem("TargetingLocal", JSON.stringify({ id: 123, consent: true }));
+JSON.parse(localStorage.getItem("TargetingLocal")).id; // 123
+
+sessionStorage.setItem("FunctionalSession", "Functional sessionStorage!");
+localStorage.removeItem("PerformanceLocal");      // delete one key
+localStorage.clear();                             // delete everything for this origin</code></pre>
+
+      <h3>Why the write is wrapped in try/catch</h3>
+      <p><code>setItem()</code> can throw a <code>QuotaExceededError</code> when storage is full, and accessing storage
+        can throw a <code>SecurityError</code> when the user or browser has disabled it. Without the
+        <code>try/catch</code>, one failed write would stop every line after it in that script block.</p>
+
+      <h3>Use cases</h3>
+      <ul>
+        <li>UI preferences such as theme or a dismissed notice (localStorage).</li>
+        <li>Multi-step form progress within one tab (sessionStorage).</li>
+        <li>Analytics or ad SDKs storing visitor IDs. This is why Web Storage falls under consent rules, just like
+          cookies.</li>
+      </ul>
+    </section>
+
+    <!-- ============================================================ -->
+    <section id="indexeddb" aria-labelledby="h-idb">
+      <h2 id="h-idb">6. IndexedDB</h2>
+      <p><span class="tag">C0004</span></p>
+      <p><strong>What it is.</strong> IndexedDB is a low-level, asynchronous, transactional database in the browser.
+        It's designed for large amounts of structured data, including files and blobs. Instead of fixed-column tables,
+        it stores JavaScript objects in <em>object stores</em>, indexed by a key. Like other web storage, it follows the
+        same-origin policy.</p>
+
+      <h3>Key concepts used in the test</h3>
+      <ul>
+        <li><strong><code>indexedDB.open(name, version)</code></strong> opens the database, or creates it if it doesn't
+          exist.</li>
+        <li><strong><code>onupgradeneeded</code></strong> runs when the database is created or the version number
+          increases. It's the only place where you can create object stores.</li>
+        <li><strong><code>createObjectStore(name, { keyPath: "id" })</code></strong> creates a store that uses each
+          record's <code>id</code> property as its key.</li>
+        <li><strong>Transaction</strong>: all reads and writes run inside one. <code>"readwrite"</code> allows changes.
+        </li>
+        <li><strong><code>put()</code></strong> inserts the record or replaces it if the key already exists, so
+          reloading the page doesn't throw a duplicate-key error. <code>add()</code> would fail on the second run.</li>
+        <li><strong><code>db.close()</code></strong>: an open connection blocks <code>deleteDatabase()</code>. Closing
+          it after the transaction lets the clear-storage script delete the database.</li>
+      </ul>
+
+      <h3>Example: read the test record back</h3>
+      <pre><code>const req = indexedDB.open("TestDB", 1);
+req.onsuccess = (e) =&gt; {
+  const db = e.target.result;
+  const get = db.transaction("TrackingStore", "readonly")
+                .objectStore("TrackingStore").get("TargetingIDB");
+  get.onsuccess = () =&gt; { console.log(get.result); db.close(); };
+};
+
+// Delete the whole database
+const del = indexedDB.deleteDatabase("TestDB");
+del.onblocked = () =&gt; console.warn("Close other tabs using TestDB");</code></pre>
+
+      <h3>Use cases</h3>
+      <ul>
+        <li>Offline data for Progressive Web Apps, such as product catalogues or messages.</li>
+        <li>Large or binary data such as images and documents.</li>
+        <li>Third-party SDKs persisting identifiers or event queues. This is why the test ties it to Targeting.</li>
+      </ul>
+    </section>
+
+    <!-- ============================================================ -->
+    <section id="cache-storage" aria-labelledby="h-cache">
+      <h2 id="h-cache">7. Cache Storage (Cache API)</h2>
+      <p><span class="tag">C0005</span></p>
+      <p><strong>What it is.</strong> Cache Storage stores pairs of HTTP <code>Request</code> and <code>Response</code>
+        objects in named caches. <code>window.caches</code> (a <code>CacheStorage</code>) acts as the directory of those
+        caches. It's mostly used by Service Workers but is also available from normal page scripts. It only works in
+        secure contexts (HTTPS or <code>localhost</code>), and it may be unavailable in some private-browsing modes.</p>
+
+      <h3>Methods</h3>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th scope="col">Method</th>
+              <th scope="col">Purpose</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><code>caches.open(name)</code></td>
+              <td>Returns the named cache, creating it if needed</td>
+            </tr>
+            <tr>
+              <td><code>cache.put(request, response)</code></td>
+              <td>Stores a response for a request URL (used in the test)</td>
+            </tr>
+            <tr>
+              <td><code>caches.match(request)</code></td>
+              <td>Finds a stored response in any cache</td>
+            </tr>
+            <tr>
+              <td><code>caches.keys()</code></td>
+              <td>Lists all cache names</td>
+            </tr>
+            <tr>
+              <td><code>caches.delete(name)</code></td>
+              <td>Deletes a whole named cache</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h3>Examples</h3>
+      <pre><code>// What the test writes: a synthetic response for a fake URL
+const cache = await caches.open("test-cache-v1");
+await cache.put("/social-cache-entry",
+  new Response("Social Cache Storage!", { headers: { "Content-Type": "text/plain" } }));
+
+// Read it back
+const res = await caches.match("/social-cache-entry");
+console.log(await res.text()); // "Social Cache Storage!"
+
+// Remove it
+await caches.delete("test-cache-v1");</code></pre>
+
+      <h3>Use cases</h3>
+      <ul>
+        <li>Offline app shell: caching HTML, CSS, JavaScript and images.</li>
+        <li>Faster repeat visits with cache-first strategies.</li>
+        <li>Storing JSON API responses for offline use.</li>
+      </ul>
+    </section>
+
+    <!-- ============================================================ -->
+    <section id="service-worker" aria-labelledby="h-sw">
+      <h2 id="h-sw">8. Service Workers</h2>
+      <p><span class="tag">Not blocked</span></p>
+      <p><strong>What it is.</strong> A Service Worker is a script that the browser runs in the background, separate
+        from the page. It acts as a network proxy: it can intercept requests, serve responses from Cache Storage, and
+        handle push messages and background sync. Service Workers require a secure context and control only pages within
+        their <em>scope</em>, which by default is the folder the worker file is served from.</p>
+
+      <h3>Lifecycle</h3>
+      <ol>
+        <li><strong>Register</strong>: the page calls <code>navigator.serviceWorker.register("/sw.js")</code>.</li>
+        <li><strong>Install</strong>: often used to pre-cache files.</li>
+        <li><strong>Activate</strong>: often used to delete old caches.</li>
+        <li><strong>Fetch</strong>: intercepts the network requests of controlled pages.</li>
+      </ol>
+
+      <h3>Example: a minimal <code>/sw.js</code></h3>
+      <pre><code>self.addEventListener("install", (e) =&gt; {
+  e.waitUntil(caches.open("app-shell-v1").then(c =&gt; c.addAll(["/", "/styles.css"])));
+});
+self.addEventListener("fetch", (e) =&gt; {
+  e.respondWith(caches.match(e.request).then(r =&gt; r || fetch(e.request)));
+});
+
+// Unregister every worker for this origin
+const regs = await navigator.serviceWorker.getRegistrations();
+await Promise.all(regs.map(r =&gt; r.unregister()));</code></pre>
+
+      <h3>Why it's relevant to consent</h3>
+      <p>Registration in the test is <strong>not blocked</strong>, and a Service Worker runs outside the page. It can
+        write to Cache Storage or IndexedDB on its own, and OneTrust's <code>text/plain</code> rewriting doesn't apply
+        inside it. If a worker stores non-essential data, either block the registration script with a category class, or
+        check consent before the worker writes anything.</p>
+      <p>If <code>/sw.js</code> doesn't exist, <code>register()</code> rejects and the <code>.catch()</code> logs a
+        warning instead of failing silently.</p>
+    </section>
+
+    <!-- ============================================================ -->
+    <section id="comparison" aria-labelledby="h-compare">
+      <h2 id="h-compare">9. Storage comparison</h2>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th scope="col"></th>
+              <th scope="col">Cookies</th>
+              <th scope="col">localStorage</th>
+              <th scope="col">sessionStorage</th>
+              <th scope="col">IndexedDB</th>
+              <th scope="col">Cache Storage</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <th scope="row">Data type</th>
+              <td>String</td>
+              <td>String</td>
+              <td>String</td>
+              <td>Objects, blobs</td>
+              <td>Request/Response</td>
+            </tr>
+            <tr>
+              <th scope="row">Sent to server</th>
+              <td>Yes, automatically</td>
+              <td>No</td>
+              <td>No</td>
+              <td>No</td>
+              <td>No</td>
+            </tr>
+            <tr>
+              <th scope="row">Lifetime</th>
+              <td><code>max-age</code>/<code>expires</code> or session</td>
+              <td>Until cleared</td>
+              <td>Until tab closes</td>
+              <td>Until cleared or evicted</td>
+              <td>Until cleared or evicted</td>
+            </tr>
+            <tr>
+              <th scope="row">API style</th>
+              <td>Sync string</td>
+              <td>Sync</td>
+              <td>Sync</td>
+              <td>Async, events</td>
+              <td>Async, Promises</td>
+            </tr>
+            <tr>
+              <th scope="row">Typical capacity</th>
+              <td>~4 KB per cookie</td>
+              <td>~5 MB per origin</td>
+              <td>~5 MB per origin</td>
+              <td>Large, quota-based</td>
+              <td>Large, quota-based</td>
+            </tr>
+            <tr>
+              <th scope="row">Available in Service Worker</th>
+              <td>No (<code>document.cookie</code>)</td>
+              <td>No</td>
+              <td>No</td>
+              <td>Yes</td>
+              <td>Yes</td>
+            </tr>
+            <tr>
+              <th scope="row">DevTools location</th>
+              <td>Application → Cookies</td>
+              <td>Application → Local storage</td>
+              <td>Application → Session storage</td>
+              <td>Application → IndexedDB</td>
+              <td>Application → Cache storage</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <p>Capacity figures are approximate and vary by browser. See the MDN guide on storage quotas in <a
+          href="#references">References</a>.</p>
+    </section>
+
+    <!-- ============================================================ -->
+    <section id="withdrawal" aria-labelledby="h-withdraw">
+      <h2 id="h-withdraw">10. Consent withdrawal and cleanup</h2>
+      <p>Blocking controls whether a script <em>runs</em>. It doesn't undo what the script has already written. When a
+        user withdraws consent, existing data stays in the browser until it's deleted. A cleanup script needs to handle
+        each storage type separately:</p>
+      <pre><code>async function clearCategory({ cookies = [], local = [], session = [], dbs = [], cachesToDrop = [] }) {
+  cookies.forEach(n =&gt; { document.cookie = `${n}=; path=/; max-age=0`; });
+  local.forEach(k =&gt; localStorage.removeItem(k));
+  session.forEach(k =&gt; sessionStorage.removeItem(k));
+  dbs.forEach(db =&gt; indexedDB.deleteDatabase(db));
+  if ("caches" in window) await Promise.all(cachesToDrop.map(c =&gt; caches.delete(c)));
+}
+
+// Example: user withdraws Targeting (C0004)
+clearCategory({ cookies: ["TargetingCookie"], local: ["TargetingLocal"], dbs: ["TestDB"] });</code></pre>
+
+      <p>A common trigger is <code>OptanonWrapper()</code>, which OneTrust calls on load and whenever consent changes.
+        Check <code>OnetrustActiveGroups</code> there and clear data for any category that is no longer active.</p>
+      <p>The server-side alternative is the <code>Clear-Site-Data</code> response header. It can clear cookies, storage
+        and cache for the origin in one step, but it clears everything, not a single category.</p>
+
+      <div class="note"><strong>Limits:</strong> JavaScript can't remove <code>HttpOnly</code> cookies or cookies set on
+        another domain, and it can't delete a cookie unless the <code>path</code> and <code>domain</code> match.
+        Third-party vendors' data in their own domains must be handled by those vendors.</div>
+    </section>
+
+    <!-- ============================================================ -->
+    <section id="testing" aria-labelledby="h-testing">
+      <h2 id="h-testing">11. How to test</h2>
+      <ol>
+        <li>Open the page in a fresh private window, or clear site data first (DevTools → Application → Storage →
+          <em>Clear site data</em>).</li>
+        <li><strong>Before interacting with the banner</strong> (opt-in model): only Strictly Necessary data should
+          exist, and none of the test keys should be present.</li>
+        <li><strong>Accept one category at a time</strong> in the Preference Center, and confirm that only that
+          category's items appear.</li>
+        <li><strong>Accept All</strong>: every item in the <a href="#overview">category table</a> should appear.</li>
+        <li><strong>Withdraw a category</strong>: confirm the script no longer runs on reload, and that the cleanup
+          script removes the existing data.</li>
+        <li>In the console, check <code>OnetrustActiveGroups</code> and the <code>OptanonConsent</code> cookie's
+          <code>groups=</code> value against what you see in storage.</li>
+        <li>Test on HTTPS. On plain HTTP, <code>Secure</code> is skipped, and Cache Storage and Service Workers won't
+          work, except on <code>localhost</code>.</li>
+      </ol>
+
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th scope="col">Scenario</th>
+              <th scope="col">Expected result</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>No consent (opt-in)</td>
+              <td>No test cookies, Web Storage keys, <code>TestDB</code> or <code>test-cache-v1</code></td>
+            </tr>
+            <tr>
+              <td>Performance only</td>
+              <td><code>PerformanceCookie</code> + <code>PerformanceLocal</code></td>
+            </tr>
+            <tr>
+              <td>Functional only</td>
+              <td><code>FunctionalCookie</code> + <code>FunctionalSession</code> (gone after closing the tab)</td>
+            </tr>
+            <tr>
+              <td>Targeting only</td>
+              <td><code>TargetingCookie</code> + <code>TargetingLocal</code> + <code>TestDB</code></td>
+            </tr>
+            <tr>
+              <td>Social Media only</td>
+              <td><code>SocialCookie</code> + <code>test-cache-v1</code></td>
+            </tr>
+            <tr>
+              <td>Any state</td>
+              <td>Service Worker registration is attempted (unblocked)</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- ============================================================ -->
+    <section id="source" aria-labelledby="h-source">
+      <h2 id="h-source">12. Full test script</h2>
+      <pre><code>&lt;!-- Helpers: no consent needed (not blocked) --&gt;
+&lt;script&gt;
+  const isHttps = location.protocol === "https:";
+  function setCookie(name, value, maxAge = 31536000) {
+    document.cookie = `${name}=${encodeURIComponent(value)}; path=/; max-age=${maxAge}; SameSite=Lax${isHttps ? "; Secure" : ""}`;
+  }
+  function safeStorage(storage, key, value) {
+    try {
+      storage.setItem(key, typeof value === "string" ? value : JSON.stringify(value));
+    } catch (e) {
+      console.warn(`Storage write failed for ${key}:`, e);
+    }
+  }
+  function writeIndexedDB(dbName, storeName, record) {
+    if (!("indexedDB" in window)) return;
+    const req = indexedDB.open(dbName, 1);
+    req.onupgradeneeded = (e) =&gt; e.target.result.createObjectStore(storeName, { keyPath: "id" });
+    req.onsuccess = (e) =&gt; {
+      const db = e.target.result;
+      const tx = db.transaction(storeName, "readwrite");
+      tx.objectStore(storeName).put(record);
+      tx.oncomplete = () =&gt; db.close();   // free the connection so deletion isn't blocked
+      tx.onerror = () =&gt; db.close();
+    };
+    req.onerror = (e) =&gt; console.warn("IndexedDB error:", e.target.error);
+  }
+&lt;/script&gt;
+
+&lt;!-- Performance (C0002) --&gt;
+&lt;script type="text/plain" class="optanon-category-C0002"&gt;
+  setCookie("PerformanceCookie", "true");
+  safeStorage(localStorage, "PerformanceLocal", "Performance localStorage!");
+&lt;/script&gt;
+
+&lt;!-- Functional (C0003) --&gt;
+&lt;script type="text/plain" class="optanon-category-C0003"&gt;
+  setCookie("FunctionalCookie", "true");
+  safeStorage(sessionStorage, "FunctionalSession", "Functional sessionStorage!");
+&lt;/script&gt;
+
+&lt;!-- Targeting (C0004) --&gt;
+&lt;script type="text/plain" class="optanon-category-C0004"&gt;
+  setCookie("TargetingCookie", "true");
+  safeStorage(localStorage, "TargetingLocal", { id: 123, consent: true });
+  writeIndexedDB("TestDB", "TrackingStore", { id: "TargetingIDB", value: "Targeting IndexedDB!" });
+&lt;/script&gt;
+
+&lt;!-- Social Media (C0005) --&gt;
+&lt;script type="text/plain" class="optanon-category-C0005"&gt;
+  setCookie("SocialCookie", "true");
+  if ("caches" in window) {
+    caches.open("test-cache-v1")
+      .then((cache) =&gt; cache.put("/social-cache-entry",
+        new Response("Social Cache Storage!", { headers: { "Content-Type": "text/plain" } })))
+      .catch((e) =&gt; console.warn("Cache write failed:", e));
+  }
+&lt;/script&gt;
+
+&lt;!-- Optional Service Worker --&gt;
+&lt;script&gt;
+  if ("serviceWorker" in navigator) {
+    navigator.serviceWorker.register("/sw.js")
+      .catch((e) =&gt; console.warn("Service Worker registration failed:", e));
+  }
+&lt;/script&gt;</code></pre>
+    </section>
+
+    <!-- ============================================================ -->
+    <section id="references" aria-labelledby="h-refs">
+      <h2 id="h-refs">13. References</h2>
+
+      <h3>OneTrust</h3>
+      <ul class="refs">
+        <li><a
+            href="https://docs.onetrust.com/en/consent--preferences/cookie-consent/managing-cookie-scripts-cookie-blocking-and-technical-implementation/client-side-cookie-management">Client-Side
+            Cookie Management: JavaScript type rewriting (OneTrust Documentation)</a></li>
+        <li><a
+            href="https://my.onetrust.com/s/article/UUID-518074a1-a6da-81c3-be52-bae7685d9c94?language=en_US">Client-Side
+            Cookie Management (myOneTrust)</a></li>
+      </ul>
+
+      <h3>Cookies (MDN)</h3>
+      <ul class="refs">
+        <li><a href="https://developer.mozilla.org/en-US/docs/Web/API/Document/cookie">Document: cookie property</a>
+        </li>
+        <li><a href="https://developer.mozilla.org/en-US/docs/Web/HTTP/Cookies">Using HTTP cookies</a></li>
+        <li><a href="https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Set-Cookie">Set-Cookie header: SameSite,
+            Secure, Max-Age</a></li>
+        <li><a
+            href="https://developer.mozilla.org/en-US/docs/Web/Security/Practical_implementation_guides/Cookies">Secure
+            cookie configuration</a></li>
+        <li><a
+            href="https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/encodeURIComponent">encodeURIComponent()</a>
+        </li>
+      </ul>
+
+      <h3>Web Storage (MDN)</h3>
+      <ul class="refs">
+        <li><a href="https://developer.mozilla.org/en-US/docs/Web/API/Web_Storage_API">Web Storage API</a></li>
+        <li><a href="https://developer.mozilla.org/en-US/docs/Web/API/Window/localStorage">Window: localStorage</a></li>
+        <li><a href="https://developer.mozilla.org/en-US/docs/Web/API/Window/sessionStorage">Window: sessionStorage</a>
+        </li>
+      </ul>
+
+      <h3>IndexedDB</h3>
+      <ul class="refs">
+        <li><a href="https://developer.mozilla.org/en-US/docs/Web/API/IndexedDB_API">IndexedDB API (MDN)</a></li>
+        <li><a href="https://developer.mozilla.org/en-US/docs/Web/API/IndexedDB_API/Using_IndexedDB">Using IndexedDB
+            (MDN)</a></li>
+        <li><a href="https://developer.mozilla.org/en-US/docs/Web/API/IDBFactory/deleteDatabase">IDBFactory:
+            deleteDatabase() (MDN)</a></li>
+      </ul>
+
+      <h3>Cache Storage and Service Workers</h3>
+      <ul class="refs">
+        <li><a href="https://developer.mozilla.org/en-US/docs/Web/API/CacheStorage">CacheStorage (MDN)</a></li>
+        <li><a href="https://developer.mozilla.org/en-US/docs/Web/API/Cache">Cache (MDN)</a></li>
+        <li><a href="https://developer.mozilla.org/en-US/docs/Web/API/Service_Worker_API">Service Worker API (MDN)</a>
+        </li>
+        <li><a href="https://developer.mozilla.org/en-US/docs/Web/API/Service_Worker_API/Using_Service_Workers">Using
+            Service Workers (MDN)</a></li>
+        <li><a href="https://web.dev/learn/pwa/offline-data/">Offline data: Cache Storage vs IndexedDB (web.dev)</a>
+        </li>
+      </ul>
+
+      <h3>Storage limits, cleanup and script types</h3>
+      <ul class="refs">
+        <li><a
+            href="https://developer.mozilla.org/en-US/docs/Web/API/Storage_API/Storage_quotas_and_eviction_criteria">Storage
+            quotas and eviction criteria (MDN)</a></li>
+        <li><a href="https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Clear-Site-Data">Clear-Site-Data header
+            (MDN)</a></li>
+        <li><a href="https://developer.mozilla.org/en-US/docs/Web/HTML/Element/script#type">The &lt;script&gt; type
+            attribute (MDN)</a></li>
+        <li><a href="https://developer.chrome.com/docs/devtools/storage/">View and edit storage in Chrome DevTools</a>
+        </li>
+      </ul>
+    </section>
+
+  </main>
+</body>
+
+</html>
